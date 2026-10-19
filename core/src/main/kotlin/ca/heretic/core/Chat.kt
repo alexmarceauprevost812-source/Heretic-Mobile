@@ -21,6 +21,6 @@ class Utf8Stream {
 
 interface InferenceEngine : AutoCloseable {
     fun prepare()
-    fun generate(path: String, messages: List<Message>, onText: (String) -> Unit)
+    fun generate(path: String, messages: List<Message>, settings: GenerationSettings, onText: (String) -> Unit)
     fun stop()
 }
