@@ -11,7 +11,9 @@ import java.io.File
 class ChatStore(context: Context) {
     private val file = AtomicFile(File(context.filesDir, "conversations.json"))
     @Synchronized fun read(): List<Conversation> {
-        if (!file.baseFile.exists()) return emptyList()
+        // Android 8/9 may have only the .bak after an interrupted atomic write.
+        // openRead() restores it; do not skip recovery just because the base is absent.
+        if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return emptyList()
         val array = JSONArray(file.openRead().bufferedReader().use { it.readText() })
         return (0 until array.length()).map { i ->
             val item = array.getJSONObject(i)

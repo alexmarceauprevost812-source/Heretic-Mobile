@@ -7,3 +7,11 @@ Compiler llama.cpp au commit du CMake avec BUILD_SHARED_LIBS=OFF, CMAKE_POSITION
 ```sh
 java -Djava.library.path=/chemin/des/bibliotheques -cp classes ca.heretic.inference.LlamaEngine /chemin/du/modele.gguf
 ```
+
+Le script `run.sh` automatise ces étapes sans télécharger de modèle :
+
+```sh
+JAVA_HOME=/chemin/du/jdk ./tests/native/run.sh /chemin/llama.cpp /chemin/modele.gguf /chemin/dossier-temporaire
+```
+
+Les sources llama.cpp doivent correspondre au commit figé dans le CMake de production.

@@ -13,6 +13,9 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -52,9 +55,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(8), dp(16), dp(8)) }
-        root.setOnApplyWindowInsetsListener { view, insets ->
-            view.setPadding(dp(16) + insets.systemWindowInsetLeft, dp(8) + insets.systemWindowInsetTop,
-                dp(16) + insets.systemWindowInsetRight, dp(8) + insets.systemWindowInsetBottom)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val edges = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            view.setPadding(dp(16) + edges.left, dp(8) + edges.top,
+                dp(16) + edges.right, dp(8) + edges.bottom)
             insets
         }
         root.addView(text("HERETIC MOBILE", 24f).apply { setTypeface(typeface, Typeface.BOLD) })
@@ -92,7 +97,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { vm.state.collect { render(it) } } }
     }
     private fun render(state: ChatState) {
-        model.text = "Modèle : ${state.model}"
+        model.text = getString(R.string.selected_model, state.model)
         status.text = state.status
         choose.isEnabled = !state.busy; history.isEnabled = !state.busy
         fresh.isEnabled = !state.busy; delete.isEnabled = !state.busy && state.messages.isNotEmpty()
