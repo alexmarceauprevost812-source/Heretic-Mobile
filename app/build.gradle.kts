@@ -8,7 +8,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
-    implementation(project(":core")); implementation(project(":data")); implementation(project(":inference"))
+    implementation(project(":websearch")); implementation(project(":core")); implementation(project(":data")); implementation(project(":inference"))
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
