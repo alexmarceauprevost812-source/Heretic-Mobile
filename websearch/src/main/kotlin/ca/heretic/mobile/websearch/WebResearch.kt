@@ -59,7 +59,7 @@ class WebResearch(private val searxBaseUrl: String) {
         val base = validatedHttps(searxBaseUrl.trimEnd('/'))
         val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.name())
         val path = base.path.trimEnd('/') + "/search"
-        val searchUrl = URI("https", base.host, path, "q=$encoded&format=json", null)
+        val searchUrl = URI.create("https://${base.host}$path?q=$encoded&format=json")
         val root = Json.parseToJsonElement(readHttps(searchUrl)).jsonObject
         val items = root["results"]?.jsonArray ?: error("Résultats SearXNG absents")
         val sources = items.mapNotNull { item ->
