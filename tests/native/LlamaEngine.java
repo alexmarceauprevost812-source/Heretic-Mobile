@@ -14,10 +14,10 @@ public final class LlamaEngine {
     private native void reset(long h);
     private native void abort(long h);
     private native void destroy(long h);
-    private native void run(long h, String path, String[] roles, byte[][] text, Sink sink, float temperature, float topP, int maxTokens, int threads);
+    private native void run(long h, String path, String[] roles, byte[][] text, Sink sink, float temperature, float topP, int maxTokens, int threads, int topK, float minP, float repeatPenalty, int repeatLastN, long seed, int contextSize);
     private native void quantize(String source, String destination, int format);
     private void infer(long h, String path, String[] roles, byte[][] text, Sink sink) {
-        run(h, path, roles, text, sink, 0.7f, 0.9f, 512, 4);
+        run(h, path, roles, text, sink, 0.7f, 0.9f, 512, 4, 40, 0.0f, 1.0f, 64, -1, 2048);
     }
     public interface Sink { void onBytes(byte[] bytes); }
     public static void main(String[] args) throws Exception {
@@ -49,7 +49,7 @@ public final class LlamaEngine {
                 throw new AssertionError("Source model changed");
             engine.reset(handle);
             try {
-                engine.run(handle, args[0], new String[]{"user"}, new byte[][]{"test".getBytes(StandardCharsets.UTF_8)}, bytes -> {}, 0.7f, 0.9f, 0, 4);
+                engine.run(handle, args[0], new String[]{"user"}, new byte[][]{"test".getBytes(StandardCharsets.UTF_8)}, bytes -> {}, 0.7f, 0.9f, 0, 4, 40, 0.0f, 1.0f, 64, -1, 2048);
                 throw new AssertionError("Expected settings error");
             } catch (IllegalStateException expected) { /* native bounds validated */ }
             engine.reset(handle);
@@ -69,3 +69,4 @@ public final class LlamaEngine {
         } finally { engine.destroy(handle); }
     }
 }
+

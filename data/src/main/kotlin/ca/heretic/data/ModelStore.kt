@@ -9,7 +9,46 @@ import java.util.UUID
 class ModelStore(private val context: Context) {
     private val prefs = context.getSharedPreferences("model", Context.MODE_PRIVATE)
     private val directory = File(context.filesDir, "models").apply { mkdirs() }
-    val path: String? get() = prefs.getString("file", null)?.let { File(directory, it) }?.takeIf { it.isFile }?.absolutePath
+    private var descriptor: android.os.ParcelFileDescriptor? = null
+    private var directUri: String? = null
+    val direct: Boolean get() = prefs.contains("uri")
+    fun release() { descriptor?.close(); descriptor = null; directUri = null }
+    private fun openDirect(uri: Uri): android.os.ParcelFileDescriptor {
+        val fd = context.contentResolver.openFileDescriptor(uri, "r") ?: error("Fichier inaccessible.")
+        try {
+            require(android.system.OsConstants.S_ISREG(android.system.Os.fstat(fd.fileDescriptor).st_mode)) { "Lecture directe indisponible." }
+            android.system.Os.lseek(fd.fileDescriptor, 0, android.system.OsConstants.SEEK_SET)
+            val magic = ByteArray(4)
+            require(android.system.Os.pread(fd.fileDescriptor, magic, 0, 4, 0) == 4 && magic.contentEquals(byteArrayOf(71,71,85,70))) { "Signature GGUF invalide." }
+            return fd
+        } catch (e: Exception) { fd.close(); throw e }
+    }
+    /** A seekable regular SAF descriptor can be reopened by llama.cpp through procfs without copying. */
+    fun select(uri: Uri, cancelled: () -> Boolean): String {
+        val fd = try { openDirect(uri) } catch (_: Exception) { return import(uri, cancelled) }
+        try {
+            context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            var label = "modele.gguf"
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) label = it.getString(0) ?: label
+            }
+            check(!cancelled()) { "Sélection arrêtée." }
+            check(prefs.edit().putString("uri", uri.toString()).putString("name", label).commit())
+            release(); descriptor = fd; directUri = uri.toString()
+            return label
+        } catch (_: SecurityException) { fd.close(); return import(uri, cancelled) }
+        catch (e: Exception) { fd.close(); throw e }
+    }
+    val size: Long get() = descriptor?.statSize ?: path?.let { File(it).length() } ?: 0L
+    val path: String? get() {
+        val uri = prefs.getString("uri", null)
+        if (uri != null) {
+            if (descriptor == null || directUri != uri) { release(); descriptor = openDirect(Uri.parse(uri)); directUri = uri }
+            return "/proc/self/fd/${descriptor!!.fd}"
+        }
+        return privatePath
+    }
+    private val privatePath: String? get() = prefs.getString("file", null)?.let { File(directory, it) }?.takeIf { it.isFile }?.absolutePath
     val name: String get() = prefs.getString("name", "Aucun modèle") ?: "Aucun modèle"
 
     /** Copy a SAF stream into a regular private file, required for native mmap. */
@@ -41,9 +80,11 @@ class ModelStore(private val context: Context) {
                 }
             } ?: error("Impossible d’ouvrir le fichier sélectionné.")
             check(!cancelled()) { "Importation arrêtée." }
-            check(prefs.edit().putString("file", target.name).putString("name", name).commit()) { "Impossible d’enregistrer le modèle." }
-            directory.listFiles()?.filter { it != target }?.forEach { it.delete() }
+            check(prefs.edit().remove("uri").putString("file", target.name).putString("name", name).commit()) { "Impossible d’enregistrer le modèle." }
+            release()
+            // Retain existing models; selecting or importing never removes user files.
             return name
         } catch (error: Exception) { target.delete(); throw error }
     }
 }
+

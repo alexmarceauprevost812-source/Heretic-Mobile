@@ -1,6 +1,10 @@
 # Heretic-Mobile
 
-Version 0.2.0 — Application Android Kotlin autonome de chat avec un modèle GGUF **sur l’appareil**. Fond noir, texte blanc, boutons et options orange, interface française. Aucun serveur, compte ou composant CodexLocal. Aucune fonction de modification des protections des modèles.
+Version 0.3.0 — Application Android Kotlin autonome de chat avec un modèle GGUF **sur l’appareil**. Fond noir, texte blanc, boutons et options orange, interface française. Aucun serveur, compte ou composant CodexLocal. Aucune fonction de modification des protections des modèles.
+
+## Atelier mobile AI Lab
+
+Consultez [le guide de l’atelier](docs/MOBILE_AI_LAB.md) pour les réglages avancés, profils, personnalités, comparaisons, découverte multi-dossiers, lecture directe GGUF et tâches LexOS PC facultatives. Les sections historiques ci-dessous décrivent la version 0.2 ; le guide 0.3 précise les comportements modifiés.
 
 ## Utilisation
 
@@ -69,3 +73,4 @@ Les tests JVM vérifient le streaming UTF-8, la recherche récursive avec cycles
 ## Dépendances
 
 llama.cpp est distribué sous licence MIT, voir `THIRD_PARTY_NOTICES.md` et `licenses/llama.cpp-LICENSE`. L’archive contient également ses notices tierces. AndroidX et Kotlin gardent leurs licences respectives. Aucune licence globale du présent dépôt n’est présumée.
+
