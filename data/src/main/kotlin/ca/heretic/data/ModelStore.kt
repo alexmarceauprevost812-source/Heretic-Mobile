@@ -46,6 +46,7 @@ class ModelStore(private val context: Context) {
                 if (it.moveToFirst()) label = it.getString(0) ?: label
             }
             check(!cancelled()) { "Sélection arrêtée." }
+            rememberPrivateLabel()
             check(prefs.edit().putString("sourceUri", uri.toString()).putString("uri", uri.toString()).putString("name", label).commit())
             release(); descriptor = fd; directUri = uri.toString()
             return label
@@ -63,9 +64,15 @@ class ModelStore(private val context: Context) {
     }
     private val privatePath: String? get() = prefs.getString("file", null)?.let { File(directory, it) }?.takeIf { it.isFile }?.absolutePath
     val name: String get() = prefs.getString("name", "Aucun modèle") ?: "Aucun modèle"
+    private fun rememberPrivateLabel() {
+        val filename = prefs.getString("file", null) ?: return
+        if (!direct && !prefs.contains("name:$filename")) {
+            check(prefs.edit().putString("name:$filename", name).commit()) { "Impossible de conserver le nom du modèle précédent." }
+        }
+    }
 
     fun privateModels(): List<Pair<String, String>> = directory.listFiles()?.filter { it.isFile && it.extension == "gguf" }?.map {
-        it.name to (prefs.getString("name:${it.name}", null) ?: if (it.name == prefs.getString("file", null)) name else "Copie ${it.name}")
+        it.name to (prefs.getString("name:${it.name}", null) ?: if (!direct && it.name == prefs.getString("file", null)) name else "Copie ${it.name}")
     }.orEmpty().sortedBy { it.second }
     fun selectPrivate(filename: String): String {
         require(privateModels().any { it.first == filename }) { "Copie privée introuvable." }
@@ -102,6 +109,7 @@ class ModelStore(private val context: Context) {
                 }
             } ?: error("Impossible d’ouvrir le fichier sélectionné.")
             check(!cancelled()) { "Importation arrêtée." }
+            rememberPrivateLabel()
             check(prefs.edit().remove("uri").putString("sourceUri", uri.toString()).putString("name:${target.name}", name).putString("source:${target.name}", uri.toString()).putString("file", target.name).putString("name", name).commit()) { "Impossible d’enregistrer le modèle." }
             release()
             // Retain existing models; selecting or importing never removes user files.
