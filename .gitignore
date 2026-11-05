@@ -7,3 +7,6 @@ local.properties
 *.iml
 *.gguf
 
+
+__pycache__/
+lexos-jobs/

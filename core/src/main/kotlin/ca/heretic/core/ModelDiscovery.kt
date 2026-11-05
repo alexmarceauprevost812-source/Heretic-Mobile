@@ -4,7 +4,7 @@ import java.util.ArrayDeque
 
 /** IDs stay opaque: Android document IDs need not be filesystem paths. */
 data class ModelEntry(val id: String, val name: String, val size: Long = -1, val directory: Boolean = false)
-data class DiscoveredModel(val id: String, val name: String, val size: Long, val folder: String, val parentId: String = "")
+data class DiscoveredModel(val id: String, val name: String, val size: Long, val folder: String, val parentId: String = "", val tree: String = "")
 
 class ModelDiscovery(private val maxEntries: Int = 10_000) {
     fun scan(root: String, children: (String) -> List<ModelEntry>, cancelled: () -> Boolean): List<DiscoveredModel> {

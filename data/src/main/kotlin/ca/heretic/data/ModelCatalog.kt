@@ -13,19 +13,11 @@ class ModelCatalog(private val context: Context) {
     val folder: Uri? get() = prefs.getString("folder", null)?.let(Uri::parse)
 
     fun remember(uri: Uri) {
-        val old = folder
         grant(uri)
-        check(prefs.edit().putString("folder", uri.toString()).commit()) { "Impossible de mémoriser le dossier." }
-        if (old != null && old != uri) {
-            val previous = context.contentResolver.persistedUriPermissions.firstOrNull { it.uri == old }
-            val flags = (if (previous?.isReadPermission == true) Intent.FLAG_GRANT_READ_URI_PERMISSION else 0) or
-                (if (previous?.isWritePermission == true) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
-            if (flags != 0) {
-                try { context.contentResolver.releasePersistableUriPermission(old, flags) }
-                catch (_: SecurityException) { /* The old grant might already have been revoked. */ }
-            }
-        }
+        check(prefs.edit().putString("folder", uri.toString()).putStringSet("folders", (folders.map { it.toString() } + uri.toString()).toSet()).commit()) { "Impossible de mémoriser le dossier." }
     }
+    val folders: List<Uri> get() = (prefs.getStringSet("folders", emptySet())!!.toList() + listOfNotNull(folder?.toString())).distinct().sorted().map(Uri::parse)
+    var scanWarnings: String = ""; private set
     fun grant(uri: Uri) {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
@@ -42,17 +34,27 @@ class ModelCatalog(private val context: Context) {
     }
     fun move(model: DiscoveredModel, target: Uri) {
         grant(target)
-        val source = folder ?: error("Choisissez un dossier.")
+        val source = model.tree.takeIf { it.isNotEmpty() }?.let(Uri::parse) ?: folder ?: error("Choisissez un dossier.")
         require(source.authority == target.authority) { "Le déplacement direct exige le même fournisseur de fichiers. Utilisez une copie via le gestionnaire Android." }
         val parent = DocumentsContract.buildDocumentUriUsingTree(source, model.parentId)
         val destination = DocumentsContract.buildDocumentUriUsingTree(target, DocumentsContract.getTreeDocumentId(target))
         check(DocumentsContract.moveDocument(context.contentResolver, uri(model), parent, destination) != null) { "Ce fournisseur ne permet pas ce déplacement." }
     }
     fun uri(model: DiscoveredModel): Uri = DocumentsContract.buildDocumentUriUsingTree(
-        folder ?: error("Choisissez un dossier de modèles."), model.id)
+        model.tree.takeIf { it.isNotEmpty() }?.let(Uri::parse) ?: folder ?: error("Choisissez un dossier de modèles."), model.id)
 
     fun scan(cancelled: () -> Boolean): List<DiscoveredModel> {
-        val tree = folder ?: error("Choisissez d’abord un dossier contenant vos modèles GGUF.")
+        require(folders.isNotEmpty()) { "Choisissez d’abord un dossier contenant vos modèles GGUF." }
+        val warnings = mutableListOf<String>()
+        val found = folders.flatMap { tree ->
+            check(!cancelled()) { "Recherche arrêtée." }
+            try { scanTree(tree, cancelled).map { it.copy(tree = tree.toString(), folder = "$tree / ${it.folder}") } }
+            catch (e: Exception) { if (cancelled()) throw e; warnings.add("$tree : ${e.message}"); emptyList() }
+        }.distinctBy { uri(it).toString() }
+        scanWarnings = warnings.joinToString("\n")
+        return found
+    }
+    private fun scanTree(tree: Uri, cancelled: () -> Boolean): List<DiscoveredModel> {
         try {
             val root = DocumentsContract.getTreeDocumentId(tree)
             return ModelDiscovery().scan(root, { id ->
