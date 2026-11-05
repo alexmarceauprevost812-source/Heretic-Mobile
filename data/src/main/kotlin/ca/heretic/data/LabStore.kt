@@ -46,7 +46,13 @@ class LabStore(context: Context) {
         try { stream.write(text.toByteArray()); file.finishWrite(stream) }
         catch (e: Exception) { file.failWrite(stream); throw e }
     }
-    fun save(profiles: List<LabProfile>) { if (exists(file)) read(); require(profiles.size <= 200) { "200 profils maximum." }; write(file, export(profiles)) }
+    fun save(profiles: List<LabProfile>) {
+        if (exists(file)) read()
+        require(profiles.size in 1..200) { "De 1 à 200 profils attendus." }
+        val encoded = export(profiles)
+        require(encoded.toByteArray().size <= 1_000_000) { "Profils trop volumineux (1 Mo maximum)." }
+        write(file, encoded)
+    }
     fun history(): JSONArray = if (exists(results)) JSONArray(results.openRead().bufferedReader().use { it.readText() }) else JSONArray()
     fun record(result: JSONObject) {
         val old = history(); val next = JSONArray()
