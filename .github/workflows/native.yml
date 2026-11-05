@@ -1,0 +1,26 @@
+name: Native JNI
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Sources llama.cpp figées et petit modèle public de test
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 https://codeload.github.com/ggml-org/llama.cpp/tar.gz/74d4f5b041ad837153b0e90fc864b8290e01d8d5 -o /tmp/llama.tar.gz
+          echo '8dd9fcc7c17f972673960ffdcc7521f52de5a9ec594aa6acebd9dfd8c17c0a5c  /tmp/llama.tar.gz' | sha256sum --check
+          mkdir /tmp/llama-source
+          tar -xzf /tmp/llama.tar.gz -C /tmp/llama-source --strip-components=1
+          curl --fail --location --retry 3 https://huggingface.co/ggml-org/models/resolve/main/tinyllamas/stories15M.gguf -o /tmp/test.gguf
+      - name: JNI réel, arrêt, réglages, graine, métadonnées et quantification
+        run: ./tests/native/run.sh /tmp/llama-source /tmp/test.gguf /tmp/native-test
