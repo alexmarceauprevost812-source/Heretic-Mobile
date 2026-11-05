@@ -21,6 +21,6 @@ jobs:
           echo '8dd9fcc7c17f972673960ffdcc7521f52de5a9ec594aa6acebd9dfd8c17c0a5c  /tmp/llama.tar.gz' | sha256sum --check
           mkdir /tmp/llama-source
           tar -xzf /tmp/llama.tar.gz -C /tmp/llama-source --strip-components=1
-          curl --fail --location --retry 3 https://huggingface.co/ggml-org/models/resolve/main/tinyllamas/stories260K.gguf -o /tmp/test.gguf
+          curl --fail --location --retry 3 https://huggingface.co/ggml-org/models/resolve/main/tinyllamas/stories15M.gguf -o /tmp/test.gguf
       - name: JNI réel, arrêt, réglages, graine, métadonnées et quantification
         run: ./tests/native/run.sh /tmp/llama-source /tmp/test.gguf /tmp/native-test

@@ -3,7 +3,6 @@ package ca.heretic.mobile
 import android.app.AlertDialog
 import ca.heretic.core.DiscoveredModel
 import ca.heretic.core.GenerationSettings
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -64,7 +63,7 @@ class MainActivity : ComponentActivity() {
     }
     private fun button(value: String, action: () -> Unit) = Button(this).apply {
         text = value; isAllCaps = false; textSize = 14f; minHeight = dp(48)
-        setTextColor(Color.BLACK); backgroundTintList = ColorStateList.valueOf(orange)
+        setTextColor(Color.WHITE); background = surface(Color.rgb(24, 12, 0), true)
         setOnClickListener { action() }
     }
     private fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -128,7 +127,7 @@ class MainActivity : ComponentActivity() {
         local.isEnabled = !state.busy
         choose.isEnabled = !state.busy; history.isEnabled = !state.busy
         fresh.isEnabled = !state.busy; delete.isEnabled = !state.busy && state.messages.isNotEmpty()
-        send.isEnabled = !state.busy && state.hasModel; stop.isEnabled = state.busy && state.canStop
+        send.isEnabled = !state.busy && state.hasModel && state.historyReady; stop.isEnabled = state.busy && state.canStop
         listOf(choose, local, options, history, fresh, delete, send, stop).forEach { it.alpha = if (it.isEnabled) 1f else 0.45f }
         input.isEnabled = !state.busy
         if (state.catalogReady && !state.busy) { vm.acknowledgeCatalog(); showLocalModels() }
@@ -163,6 +162,7 @@ class MainActivity : ComponentActivity() {
         }
         content.addView(text(if (state.hasModel) "Modèle actif : ${state.model}" else "Aucun modèle importé", 14f))
         content.addView(text("Autorisez Documents, un dossier personnel, un sous-dossier de Téléchargements ou une clé USB avec le sélecteur Android. Les dossiers autorisés sont mémorisés. Android peut interdire la racine de Téléchargements. Un modèle dans le stockage privé d’une autre application nécessite une exportation par cette application. Aucune recherche hors des dossiers autorisés.", 14f))
+        state.privateModels.forEach { (filename, label) -> content.addView(button("Copie conservée : $label") { vm.selectPrivate(filename) }) }
         val list = ListView(this).apply {
             setBackgroundColor(Color.BLACK)
             emptyView = null

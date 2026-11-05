@@ -13,4 +13,9 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 }
-dependencies { implementation(project(":core")) }
+dependencies {
+    implementation(project(":core"))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+}
+

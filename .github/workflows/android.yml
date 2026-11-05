@@ -26,7 +26,7 @@ jobs:
       - name: Tests du compagnon PC
         run: python3 -m unittest discover -s pc -v
       - name: Tests, analyse et APK
-        run: ./gradlew :core:test :app:lintDebug :app:assembleDebug --max-workers=2
+        run: ./gradlew :core:test :data:testDebugUnitTest :app:lintDebug :app:assembleDebug --max-workers=2
       - uses: actions/upload-artifact@v4
         with:
           name: Heretic-Mobile-debug
@@ -38,5 +38,6 @@ jobs:
           name: verification-reports
           path: |
             core/build/reports/tests/
+            data/build/reports/tests/
             app/build/reports/lint-results-debug.html
 

@@ -34,6 +34,8 @@ data class ChatState(
     val chats: List<Conversation> = emptyList(),
     val model: String = "Aucun modèle", val hasModel: Boolean = false,
     val settings: GenerationSettings = GenerationSettings(),
+    val privateModels: List<Pair<String, String>> = emptyList(),
+    val historyReady: Boolean = false,
     val compatibility: Map<String, String> = emptyMap(),
     val profiles: List<LabProfile> = emptyList(),
     val comparisonHistory: String = "[]",
@@ -65,17 +67,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(worker) {
             try {
                 val chats = store.read()
-                mutable.update { it.copy(chats = chats, settings = preferences.read(), profiles = lab.read(), comparisonHistory = lab.history().toString(2), model = models.name, hasModel = models.hasSelection, hasFolder = catalog.folder != null,
+                mutable.update { it.copy(chats = chats, historyReady = true) }
+                mutable.update { it.copy(chats = chats, settings = preferences.read(), profiles = lab.read(), privateModels = models.privateModels(), comparisonHistory = lab.history().toString(2), model = models.name, hasModel = models.hasSelection, hasFolder = catalog.folder != null,
                     busy = false, status = "Prêt • 100 % local") }
             } catch (error: Exception) {
-                mutable.update { it.copy(model = models.name, hasModel = models.hasSelection, hasFolder = catalog.folder != null, busy = false, status = "Historique illisible : ${error.message}") }
+                mutable.update { it.copy(model = models.name, hasModel = models.hasSelection, hasFolder = catalog.folder != null, busy = false, status = "Lecture des données impossible (fichiers conservés) : ${error.message}") }
             }
         }
     }
     fun newChat() { if (!state.value.busy) mutable.update { it.copy(id = UUID.randomUUID().toString(), messages = emptyList(), status = "Nouvelle discussion") } }
     fun select(chat: Conversation) { if (!state.value.busy) mutable.update { it.copy(id = chat.id, messages = chat.messages, status = "Discussion restaurée") } }
     fun deleteCurrent() {
-        if (state.value.busy) return
+        if (state.value.busy || !state.value.historyReady) return
         val current = state.value
         mutable.update { it.copy(busy = true) }
         viewModelScope.launch(worker) {
@@ -90,13 +93,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun importModel(uri: Uri) {
         if (state.value.busy) return
         stopped.set(false)
-        mutable.update { it.copy(busy = true, status = "Copie du GGUF dans l’espace privé…") }
+        mutable.update { it.copy(busy = true, status = "Ouverture du GGUF • lecture directe si possible…") }
         viewModelScope.launch(worker) {
             try {
                 // Release the old mmap before replacing the file.
                 engine?.close(); engine = null
                 val name = models.select(uri) { stopped.get() }
-                mutable.update { it.copy(model = name, hasModel = true, status = if (models.direct) "Modèle sélectionné • lecture directe, sans copie" else "Modèle importé • copie nécessaire pour ce fournisseur", modelInfo = "Compatibilité inconnue • utilisez Informations du modèle") }
+                mutable.update { it.copy(model = name, hasModel = true, privateModels = models.privateModels(), status = if (models.direct) "Modèle sélectionné • lecture directe, sans copie" else "Modèle importé • copie nécessaire pour ce fournisseur", modelInfo = "Compatibilité inconnue • utilisez Informations du modèle") }
             } catch (error: Exception) { report(error) }
             finally { mutable.update { it.copy(busy = false) } }
         }
@@ -185,7 +188,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun send(text: String) {
         val snapshot = state.value
-        if (snapshot.busy || !snapshot.hasModel || text.isBlank()) return
+        if (snapshot.busy || !snapshot.historyReady || !snapshot.hasModel || text.isBlank()) return
         stopped.set(false)
         val history = snapshot.messages.filter { it.text.isNotBlank() } + Message("user", text.trim())
         mutable.update { it.copy(messages = history + Message("assistant", ""), busy = true, status = "Chargement et lecture du contexte…") }
@@ -222,6 +225,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             finally { mutable.update { it.copy(busy = false, canStop = true) } }
         }
     }
+    fun selectPrivate(filename: String) = labAction("Sélection de la copie privée…") {
+        engine?.close(); engine = null
+        val name = models.selectPrivate(filename)
+        mutable.update { it.copy(model = name, hasModel = true, modelInfo = "Compatibilité à vérifier", status = "Copie privée sélectionnée • aucun nouvel import") }
+    }
     fun unload() = labAction("Déchargement…") {
         engine?.close(); engine = null
         mutable.update { it.copy(status = "Modèle déchargé de la RAM • sélection conservée") }
@@ -229,7 +237,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun inspectModel() = labAction("Lecture des métadonnées…") {
         val path = models.path ?: error("Sélectionnez un GGUF.")
         val info = LlamaEngine().use { it.inspect(path) }
-        mutable.update { it.copy(compatibility = models.selectedUri?.let { uri -> it.compatibility + (uri to "Métadonnées reconnues • chargement complet à vérifier") } ?: it.compatibility, modelInfo = "${models.name} • ${models.size / (1024 * 1024)} Mio\n$info", status = info) }
+        mutable.update { it.copy(compatibility = models.selectedUri?.let { uri -> it.compatibility + (uri to "Métadonnées reconnues • chargement complet à vérifier") } ?: it.compatibility, modelInfo = "${models.name} • ${models.size / (1024 * 1024)} Mio\n$info", status = "Métadonnées lues • chargement complet à vérifier") }
     }
     fun saveProfile(name: String, source: LabProfile? = null) = labAction("Enregistrement du profil…") {
         require(name.isNotBlank() && name.length <= 100) { "Nom : 1 à 100 caractères." }

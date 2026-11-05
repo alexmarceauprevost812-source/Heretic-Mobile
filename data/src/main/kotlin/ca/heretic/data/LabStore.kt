@@ -27,7 +27,7 @@ object SettingsJson {
 class LabStore(context: Context) {
     private val file = AtomicFile(File(context.filesDir, "lab-profiles-v1.json"))
     private val results = AtomicFile(File(context.filesDir, "lab-comparisons-v1.json"))
-    fun read(): List<LabProfile> = if (file.baseFile.exists()) parse(file.openRead().bufferedReader().use { it.readText() }) else presets()
+    fun read(): List<LabProfile> = if (exists(file)) parse(file.openRead().bufferedReader().use { it.readText() }) else presets()
     fun export(profiles: List<LabProfile>): String = JSONObject().put("version", 1).put("profiles", JSONArray().apply {
         profiles.forEach { put(JSONObject().put("id", it.id).put("name", it.name).put("model", it.model).put("settings", SettingsJson.encode(it.settings))) }
     }).toString(2)
@@ -40,13 +40,14 @@ class LabStore(context: Context) {
             val model = j.optString("model", ""); require(model.length <= 2000)
             LabProfile(j.getString("id"), name, model, SettingsJson.decode(j.getJSONObject("settings"))) }
     }
+    private fun exists(file: AtomicFile) = file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()
     private fun write(file: AtomicFile, text: String) {
         val stream = file.startWrite()
         try { stream.write(text.toByteArray()); file.finishWrite(stream) }
         catch (e: Exception) { file.failWrite(stream); throw e }
     }
-    fun save(profiles: List<LabProfile>) { require(profiles.size <= 200) { "200 profils maximum." }; write(file, export(profiles)) }
-    fun history(): JSONArray = if (results.baseFile.exists()) JSONArray(results.openRead().bufferedReader().use { it.readText() }) else JSONArray()
+    fun save(profiles: List<LabProfile>) { if (exists(file)) read(); require(profiles.size <= 200) { "200 profils maximum." }; write(file, export(profiles)) }
+    fun history(): JSONArray = if (exists(results)) JSONArray(results.openRead().bufferedReader().use { it.readText() }) else JSONArray()
     fun record(result: JSONObject) {
         val old = history(); val next = JSONArray()
         for (i in maxOf(0, old.length() - 99) until old.length()) next.put(old.getJSONObject(i))

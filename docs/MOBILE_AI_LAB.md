@@ -2,7 +2,7 @@
 
 ## Fonctions
 
-L’atelier conserve l’identifiant Android `ca.heretic.mobile`, les discussions et les clés historiques de réglages. Les nouveaux fichiers de profils et de comparaisons sont séparés. Les copies privées de modèles déjà importées ne sont plus effacées lors d’un nouvel import. Aucun modèle n’est ajouté au dépôt.
+L’atelier conserve l’identifiant Android `ca.heretic.mobile`, les discussions et les clés historiques de réglages. Les nouveaux fichiers de profils et de comparaisons sont séparés. Les copies privées de modèles déjà importées ne sont plus effacées lors d’un nouvel import et peuvent être sélectionnées depuis la liste des copies conservées. Aucun modèle n’est ajouté au dépôt.
 
 Options propose les réglages simples, avancés, la personnalité, les profils, les comparaisons, les informations GGUF, le déchargement et les tâches PC. Les six profils initiaux sont des points de départ ; le profil batterie réduit threads et longueur, sans promettre une autonomie mesurée.
 
