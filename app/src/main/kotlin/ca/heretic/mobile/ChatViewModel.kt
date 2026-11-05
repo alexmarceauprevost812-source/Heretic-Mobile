@@ -34,6 +34,7 @@ data class ChatState(
     val chats: List<Conversation> = emptyList(),
     val model: String = "Aucun modèle", val hasModel: Boolean = false,
     val settings: GenerationSettings = GenerationSettings(),
+    val compatibility: Map<String, String> = emptyMap(),
     val profiles: List<LabProfile> = emptyList(),
     val comparisonHistory: String = "[]",
     val modelInfo: String = "Compatibilité inconnue : sélectionnez le modèle et vérifiez ses informations.",
@@ -64,10 +65,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(worker) {
             try {
                 val chats = store.read()
-                mutable.update { it.copy(chats = chats, settings = preferences.read(), profiles = lab.read(), comparisonHistory = lab.history().toString(2), model = models.name, hasModel = models.path != null, hasFolder = catalog.folder != null,
+                mutable.update { it.copy(chats = chats, settings = preferences.read(), profiles = lab.read(), comparisonHistory = lab.history().toString(2), model = models.name, hasModel = models.hasSelection, hasFolder = catalog.folder != null,
                     busy = false, status = "Prêt • 100 % local") }
             } catch (error: Exception) {
-                mutable.update { it.copy(model = models.name, hasModel = models.path != null, hasFolder = catalog.folder != null, busy = false, status = "Historique illisible : ${error.message}") }
+                mutable.update { it.copy(model = models.name, hasModel = models.hasSelection, hasFolder = catalog.folder != null, busy = false, status = "Historique illisible : ${error.message}") }
             }
         }
     }
@@ -156,6 +157,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             var temporary: File? = null
             var success = false
             try {
+                require(!models.isSource(destination)) { "Choisissez un nouveau fichier ; la source doit rester intacte." }
                 val input = File(models.path ?: error("Importez d’abord un modèle."))
                 val context = getApplication<Application>()
                 require(context.cacheDir.usableSpace > models.size * 4 + 64L * 1024 * 1024) {
@@ -173,7 +175,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             catch (error: LinkageError) { mutable.update { it.copy(status = "Convertisseur natif indisponible : ${error.message}") } }
             finally {
                 temporary?.delete()
-                if (!success) {
+                if (!success && !models.isSource(destination)) {
                     try { DocumentsContract.deleteDocument(getApplication<Application>().contentResolver, destination) }
                     catch (_: Exception) { /* A provider may leave a partial destination file. */ }
                 }
@@ -202,7 +204,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
-                mutable.update { it.copy(status = if (stopped.get()) "Génération arrêtée" else "Réponse terminée • ${engine?.summary()}") }
+                mutable.update { it.copy(status = if (stopped.get()) "Génération arrêtée • ${engine?.summary()}" else "Réponse terminée • ${engine?.summary()}") }
             } catch (error: Exception) { report(error) }
             catch (error: LinkageError) { mutable.update { it.copy(status = "Moteur natif indisponible sur cet appareil : ${error.message}") } }
             finally {
@@ -227,7 +229,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun inspectModel() = labAction("Lecture des métadonnées…") {
         val path = models.path ?: error("Sélectionnez un GGUF.")
         val info = LlamaEngine().use { it.inspect(path) }
-        mutable.update { it.copy(modelInfo = "${models.name} • ${models.size / (1024 * 1024)} Mio\n$info", status = info) }
+        mutable.update { it.copy(compatibility = models.selectedUri?.let { uri -> it.compatibility + (uri to "Métadonnées reconnues • chargement complet à vérifier") } ?: it.compatibility, modelInfo = "${models.name} • ${models.size / (1024 * 1024)} Mio\n$info", status = info) }
     }
     fun saveProfile(name: String, source: LabProfile? = null) = labAction("Enregistrement du profil…") {
         require(name.isNotBlank() && name.length <= 100) { "Nom : 1 à 100 caractères." }

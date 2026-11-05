@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var fresh: Button
     private lateinit var history: Button
     private lateinit var delete: Button
+    private var displayedInfo: String? = null
     private var rendered: List<ca.heretic.core.Message>? = null
     private val remoteResult = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> uri?.let(vm::remoteDownload) }
     private val profileImport = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importProfiles) }
@@ -119,6 +120,10 @@ class MainActivity : ComponentActivity() {
     private fun render(state: ChatState) {
         model.text = getString(R.string.selected_model, state.model)
         status.text = state.status
+        if (!state.busy && state.modelInfo != displayedInfo && state.modelInfo.startsWith(state.model + " •")) {
+            displayedInfo = state.modelInfo
+            AlertDialog.Builder(this).setTitle("Informations GGUF").setMessage(state.modelInfo).setPositiveButton("Fermer", null).show()
+        }
         options.isEnabled = !state.busy
         local.isEnabled = !state.busy
         choose.isEnabled = !state.busy; history.isEnabled = !state.busy
@@ -164,7 +169,7 @@ class MainActivity : ComponentActivity() {
         }
         val labels = state.localModels.map { model ->
             val size = if (model.size >= 0) Formatter.formatFileSize(this, model.size) else "Taille inconnue"
-            "${model.name} • $size\n${model.folder.ifEmpty { "Dossier choisi" }}\nCompatibilité inconnue • vérifier après sélection"
+            "${model.name} • $size\n${model.folder.ifEmpty { "Dossier choisi" }}\n${state.compatibility[android.provider.DocumentsContract.buildDocumentUriUsingTree(android.net.Uri.parse(model.tree), model.id).toString()] ?: "Compatibilité inconnue • vérifier après sélection"}"
         }
         list.adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, labels) {
             override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =

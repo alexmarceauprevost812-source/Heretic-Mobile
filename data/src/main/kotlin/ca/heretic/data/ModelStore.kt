@@ -12,6 +12,9 @@ class ModelStore(private val context: Context) {
     private var descriptor: android.os.ParcelFileDescriptor? = null
     private var directUri: String? = null
     val direct: Boolean get() = prefs.contains("uri")
+    val selectedUri: String? get() = prefs.getString("uri", null)
+    val hasSelection: Boolean get() = direct || privatePath != null
+    fun isSource(uri: Uri): Boolean = selectedUri == uri.toString()
     fun release() { descriptor?.close(); descriptor = null; directUri = null }
     private fun openDirect(uri: Uri): android.os.ParcelFileDescriptor {
         val fd = context.contentResolver.openFileDescriptor(uri, "r") ?: error("Fichier inaccessible.")
@@ -27,7 +30,16 @@ class ModelStore(private val context: Context) {
     fun select(uri: Uri, cancelled: () -> Boolean): String {
         val fd = try { openDirect(uri) } catch (_: Exception) { return import(uri, cancelled) }
         try {
-            context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val resolver = context.contentResolver
+            try { resolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            catch (e: SecurityException) {
+                val parentGrant = resolver.persistedUriPermissions.any { permission ->
+                    permission.isReadPermission && permission.uri.authority == uri.authority &&
+                        android.provider.DocumentsContract.isTreeUri(uri) &&
+                        runCatching { android.provider.DocumentsContract.getTreeDocumentId(permission.uri) == android.provider.DocumentsContract.getTreeDocumentId(uri) }.getOrDefault(false)
+                }
+                if (!parentGrant) throw e
+            }
             var label = "modele.gguf"
             context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
                 if (it.moveToFirst()) label = it.getString(0) ?: label

@@ -15,6 +15,7 @@ public final class LlamaEngine {
     private native void abort(long h);
     private native void destroy(long h);
     private native void run(long h, String path, String[] roles, byte[][] text, Sink sink, float temperature, float topP, int maxTokens, int threads, int topK, float minP, float repeatPenalty, int repeatLastN, long seed, int contextSize);
+    private native String inspect(String path);
     private native void quantize(String source, String destination, int format);
     private void infer(long h, String path, String[] roles, byte[][] text, Sink sink) {
         run(h, path, roles, text, sink, 0.7f, 0.9f, 512, 4, 40, 0.0f, 1.0f, 64, -1, 2048);
@@ -24,6 +25,16 @@ public final class LlamaEngine {
         LlamaEngine engine = new LlamaEngine();
         long handle = engine.create();
         try {
+            if (!engine.inspect(args[0]).contains("reconnues")) throw new AssertionError("Metadata missing");
+            String[] seeded = new String[2];
+            for (int round = 0; round < 2; round++) {
+                engine.reset(handle);
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                engine.run(handle, args[0], new String[]{"user"}, new byte[][]{"Once upon a time".getBytes(StandardCharsets.UTF_8)},
+                    bytes -> out.write(bytes, 0, bytes.length), 0.8f, 0.95f, 16, 2, 12, 0.05f, 1.1f, 32, 42, 1024);
+                seeded[round] = out.toString(StandardCharsets.UTF_8);
+            }
+            if (seeded[0].isEmpty() || !seeded[0].equals(seeded[1])) throw new AssertionError("Seeded advanced sampling not reproducible");
             AtomicInteger tokens = new AtomicInteger();
             engine.reset(handle);
             engine.infer(handle, args[0], new String[]{"user"}, new byte[][]{"Once upon a time".getBytes(StandardCharsets.UTF_8)}, bytes -> {
